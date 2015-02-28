@@ -76,6 +76,23 @@ class WordPicker:
         self.text_ = read_file(self.file_name)
         return True
 
+class SourceMappingGenerator:
+    def __init__(self, compiled_file, source_files):
+        self.compiled_file_ = compiled_file
+        self.source_files_ = source_files
+        self.sourcemap_ = []
+        self.line_ = 0
+
+
+    def add_mapping(self, generated_line, generated_column, source_file_index, source_line, source_column):
+        if self.line_ != generated_line:
+            self.sourcemap_.append(";")
+            self.line_ = generated_line
+        self.sourcemap_.append(encode([generated_column, source_file_index, source_line, source_column))
+
+    def output(self):
+        print 
+
 
 picker = WordPicker(["1.txt", "2.txt"])
 while True:

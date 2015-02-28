@@ -1,5 +1,4 @@
 import re
-import collections
 
 
 BASE64_DIGITS="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -36,7 +35,7 @@ def read_file(file_name):
 
 class WordPicker:
     def __init__(self, files):
-        self.file_names_ = collections.deque(files)
+        self.file_names_ = files
         self.file_index = -1
         self._next_file()
 
@@ -67,20 +66,20 @@ class WordPicker:
                 return None
 
     def _next_file(self):
-        if len(self.file_names_) == 0:
+        self.file_index += 1
+        if self.file_index == len(self.file_names_):
             return False
-        ++self.file_index
-        self.file_name = self.file_names_.popleft()
+        self.file_name = self.file_names_[self.file_index]
         self.line = 0
         self.column = 0
         self.pos_ = 0
         self.text_ = read_file(self.file_name)
         return True
 
+
 picker = WordPicker(["1.txt", "2.txt"])
 while True:
     word = picker.next_word()
     if not word:
         break
-    print "word: %s lineNumber: %d column: %d" % (word, picker.line, picker.column - len(word))
-
+    print "%s:%d:%d  --- %s" % (picker.file_name, picker.line, picker.column - len(word), word)

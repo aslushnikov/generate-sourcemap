@@ -1,5 +1,5 @@
+from cStringIO import StringIO
 import re
-
 
 BASE64_DIGITS="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 VLQ_BASE_SHIFT = 5;
@@ -34,82 +34,86 @@ def read_file(file_name):
 
 
 class WordPicker:
-    def __init__(self, files):
-        self.file_names_ = files
-        self.file_index = -1
-        self._next_file()
+    def __init__(self, sources):
+        self._sources = sources
+        self.source_index = -1
+        self._next_source()
 
-    def _next_file_word(self):
+    def _next_source_word(self):
         # Roll until we find a word char
-        while self.pos_ < len(self.text_) and re.match('\W', self.text_[self.pos_]):
-            char = self.text_[self.pos_]
+        while self._pos < len(self._text) and re.match('\W', self._text[self._pos]):
+            char = self._text[self._pos]
             if char == '\n':
                 self.line += 1
                 self.column = 0
             else:
                 self.column += 1
-            self.pos_ += 1
-        if self.pos_ == len(self.text_):
+            self._pos += 1
+        if self._pos == len(self._text):
             return None
-        word_start = self.pos_
-        while self.pos_ < len(self.text_) and re.match('\w', self.text_[self.pos_]):
-            self.pos_ += 1
+        word_start = self._pos
+        while self._pos < len(self._text) and re.match('\w', self._text[self._pos]):
+            self._pos += 1
             self.column += 1
-        return self.text_[word_start:self.pos_]
+        return self._text[word_start:self._pos]
 
     def next_word(self):
         while True:
-            word = self._next_file_word()
+            word = self._next_source_word()
             if word:
                 return word
-            if not self._next_file():
+            if not self._next_source():
                 return None
 
-    def _next_file(self):
-        self.file_index += 1
-        if self.file_index == len(self.file_names_):
+    def _next_source(self):
+        self.source_index += 1
+        if self.source_index == len(self._sources):
             return False
-        self.file_name = self.file_names_[self.file_index]
         self.line = 0
         self.column = 0
-        self.pos_ = 0
-        self.text_ = read_file(self.file_name)
+        self._pos = 0
+        self._text = self._sources[self.source_index]
         return True
 
 class SourceMappingGenerator:
-    def __init__(self, source_files, compiled_file):
-        self.source_files_ = source_files
-        self.compiled_file_ = compiled_file
-        self.sourcemap_ = []
-        self.current_line_number_ = 0
-        self.sourcemap_line_ = []
+    def __init__(self):
+        self._not_empty = False
+        self._sourcemap = StringIO()
+        self._current_line_number = 0
 
 
     def add_mapping(self, generated_line, generated_column, source_file_index, source_line, source_column):
-        if self.current_line_number_ != generated_line:
-            self._push_sourcemap_line()
-            self.current_line_number_ = generated_line
-        self.sourcemap_line_.append(encode([generated_column, source_file_index, source_line, source_column]))
+        if self._not_empty and self._current_line_number == generated_line:
+            self._sourcemap.write(",")
+        while self._current_line_number < generated_line:
+            self._sourcemap.write(";")
+            self._current_line_number += 1
+        self._sourcemap.write(encode([generated_column, source_file_index, source_line, source_column]))
+        self._not_empty = True
 
 
     def _push_sourcemap_line(self):
-        self.sourcemap_.append(",".join(self.sourcemap_line_))
-        self.sourcemap_line_ = []
+        self.sourcemap_.append(",".join(self._sourcemap_line))
+        self._sourcemap_line = []
 
 
     def output(self):
-        if len(self.sourcemap_line_) > 0:
-            self._push_sourcemap_line()
-        print ";".join(self.sourcemap_)
+        print self._sourcemap.getvalue()
 
 
 file_names = ["1.txt", "2.txt"]
 output_file = "out.txt"
 
-source_picker = WordPicker(file_names)
-generated_picker = WordPicker([output_file])
+origin_sources = []
+for origin_file_name in file_names:
+    origin_sources.append(read_file(origin_file_name))
 
-sourceMap = SourceMappingGenerator(file_names, output_file)
+generated_source = read_file(output_file)
+
+source_picker = WordPicker(origin_sources)
+generated_picker = WordPicker([generated_source])
+
+sourceMap = SourceMappingGenerator()
 while True:
     generated_word = generated_picker.next_word()
     if generated_word == None:
@@ -120,8 +124,7 @@ while True:
     if source_word == None:
         raise Exception("Failed to match generated and source files")
     word_len = len(generated_word)
-    sourceMap.add_mapping(generated_picker.line, generated_picker.column - word_len, source_picker.file_index, source_picker.line, source_picker.column - word_len)
-
+    sourceMap.add_mapping(generated_picker.line, generated_picker.column - word_len, source_picker.source_index, source_picker.line, source_picker.column - word_len)
 
 sourceMap.output()
 

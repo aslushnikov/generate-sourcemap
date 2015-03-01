@@ -75,7 +75,7 @@ class WordPicker:
         self._text = self._sources[self.source_index]
         return True
 
-class SourceMappingGenerator:
+class SourceMappingStringGenerator:
     def __init__(self):
         self._not_empty = False
         self._sourcemap = StringIO()
@@ -97,8 +97,8 @@ class SourceMappingGenerator:
         self._sourcemap_line = []
 
 
-    def output(self):
-        print self._sourcemap.getvalue()
+    def value(self):
+        return self._sourcemap.getvalue()
 
 
 file_names = ["1.txt", "2.txt"]
@@ -113,7 +113,7 @@ generated_source = read_file(output_file)
 source_picker = WordPicker(origin_sources)
 generated_picker = WordPicker([generated_source])
 
-sourceMap = SourceMappingGenerator()
+sourceMap = SourceMappingStringGenerator()
 while True:
     generated_word = generated_picker.next_word()
     if generated_word == None:
@@ -126,6 +126,6 @@ while True:
     word_len = len(generated_word)
     sourceMap.add_mapping(generated_picker.line, generated_picker.column - word_len, source_picker.source_index, source_picker.line, source_picker.column - word_len)
 
-sourceMap.output()
+print sourceMap.value()
 
 

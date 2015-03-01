@@ -77,26 +77,52 @@ class WordPicker:
         return True
 
 class SourceMappingGenerator:
-    def __init__(self, compiled_file, source_files):
-        self.compiled_file_ = compiled_file
+    def __init__(self, source_files, compiled_file):
         self.source_files_ = source_files
+        self.compiled_file_ = compiled_file
         self.sourcemap_ = []
-        self.line_ = 0
+        self.current_line_number_ = 0
+        self.sourcemap_line_ = []
 
 
     def add_mapping(self, generated_line, generated_column, source_file_index, source_line, source_column):
-        if self.line_ != generated_line:
-            self.sourcemap_.append(";")
-            self.line_ = generated_line
-        self.sourcemap_.append(encode([generated_column, source_file_index, source_line, source_column))
+        if self.current_line_number_ != generated_line:
+            self._push_sourcemap_line()
+            self.current_line_number_ = generated_line
+        self.sourcemap_line_.append(encode([generated_column, source_file_index, source_line, source_column]))
+
+
+    def _push_sourcemap_line(self):
+        self.sourcemap_.append(",".join(self.sourcemap_line_))
+        self.sourcemap_line_ = []
+
 
     def output(self):
-        print 
+        if len(self.sourcemap_line_) > 0:
+            self._push_sourcemap_line()
+        print ";".join(self.sourcemap_)
 
 
-picker = WordPicker(["1.txt", "2.txt"])
+file_names = ["1.txt", "2.txt"]
+output_file = "out.txt"
+
+source_picker = WordPicker(file_names)
+generated_picker = WordPicker([output_file])
+
+sourceMap = SourceMappingGenerator(file_names, output_file)
 while True:
-    word = picker.next_word()
-    if not word:
-        break
-    print "%s:%d:%d  --- %s" % (picker.file_name, picker.line, picker.column - len(word), word)
+    generated_word = generated_picker.next_word()
+    if generated_word == None:
+        break;
+    source_word = source_picker.next_word()
+    while source_word != None and source_word != generated_word:
+        source_word = source_picker.next_word()
+    if source_word == None:
+        raise Exception("Failed to match generated and source files")
+    word_len = len(generated_word)
+    sourceMap.add_mapping(generated_picker.line, generated_picker.column - word_len, source_picker.file_index, source_picker.line, source_picker.column - word_len)
+
+
+sourceMap.output()
+
+

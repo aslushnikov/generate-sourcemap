@@ -1,36 +1,41 @@
+#!/usr/bin/env python
+#
+# Copyright 2014 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
 from cStringIO import StringIO
+from modular_build import read_file
 import re
 
-BASE64_DIGITS="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-VLQ_BASE_SHIFT = 5;
-VLQ_CONTINUATION_BIT = 2**VLQ_BASE_SHIFT;
+BASE64_DIGITS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+VLQ_BASE_SHIFT = 5
+VLQ_CONTINUATION_BIT = 2 ** VLQ_BASE_SHIFT
 VLQ_BASE_MASK = VLQ_CONTINUATION_BIT - 1
 
 
 def encode_primitive(number):
     if number == 0:
         return BASE64_DIGITS[0]
-    number <<= 1
+    if number < 0:
+        number = ((-number) << 1) | 1
+    else:
+        number <<= 1
     letters = []
     while number > 0:
-        digit = number & VLQ_BASE_MASK;
+        digit = number & VLQ_BASE_MASK
         number >>= VLQ_BASE_SHIFT
         if number > 0:
             digit |= VLQ_CONTINUATION_BIT
         letters.append(BASE64_DIGITS[digit])
-    return "".join(letters)
+    return ''.join(letters)
 
 
 def encode(numbers):
     codes = []
     for number in numbers:
         codes.append(encode_primitive(number))
-    return "".join(codes)
-
-
-def read_file(file_name):
-    with open(file_name, 'r') as input:
-        return input.read()
+    return ''.join(codes)
 
 
 class WordPicker:
@@ -75,27 +80,30 @@ class WordPicker:
         self._text = self._sources[self.source_index]
         return True
 
+
 class SourceMappingStringGenerator:
     def __init__(self):
         self._not_empty = False
         self._sourcemap = StringIO()
-        self._current_line_number = 0
+        self._generated_line_number = 0
+        self._generated_column_number = 0
+        self._source_index = 0
+        self._source_line_number = 0
+        self._source_column_number = 0
 
-
-    def add_mapping(self, generated_line, generated_column, source_file_index, source_line, source_column):
-        if self._not_empty and self._current_line_number == generated_line:
-            self._sourcemap.write(",")
-        while self._current_line_number < generated_line:
-            self._sourcemap.write(";")
-            self._current_line_number += 1
-        self._sourcemap.write(encode([generated_column, source_file_index, source_line, source_column]))
+    def add_mapping(self, generated_line, generated_column, source_index, source_line, source_column):
+        if self._not_empty and self._generated_line_number == generated_line:
+            self._sourcemap.write(',')
+        while self._generated_line_number < generated_line:
+            self._sourcemap.write(';')
+            self._generated_line_number += 1
+            self._generated_column_number = 0
+        self._sourcemap.write(encode([generated_column - self._generated_column_number, source_index - self._source_index, source_line - self._source_line_number, source_column - self._source_column_number]))
+        self._generated_column_number = generated_column
+        self._source_index = source_index
+        self._source_line_number = source_line
+        self._source_column_number = source_column
         self._not_empty = True
-
-
-    def _push_sourcemap_line(self):
-        self.sourcemap_.append(",".join(self._sourcemap_line))
-        self._sourcemap_line = []
-
 
     def value(self):
         return self._sourcemap.getvalue()
@@ -107,12 +115,10 @@ class SourceMappingStringIO:
         self.source_names = []
         self.sources = []
 
-
     def write(self, text):
         self._out.write(text)
         self.source_names.append(None)
         self.sources.append(text)
-
 
     def writeFile(self, file_name):
         text = read_file(file_name)
@@ -120,9 +126,16 @@ class SourceMappingStringIO:
         self.source_names.append(file_name)
         self.sources.append(text)
 
+    def writeNamedSource(self, text, source_name):
+        self._out.write(text)
+        self.source_names.append(source_name)
+        self.sources.append(text)
 
     def getvalue(self):
         return self._out.getvalue()
+
+    def close(self):
+        self._out.close()
 
 
 def build_source_map(sources, source_names, generated_name, generated_source):
@@ -139,13 +152,13 @@ def build_source_map(sources, source_names, generated_name, generated_source):
     source_mapping = SourceMappingStringGenerator()
     while True:
         generated_word = generated_picker.next_word()
-        if generated_word == None:
-            break;
+        if generated_word is None:
+            break
         source_word = source_picker.next_word()
-        while source_word != None and source_word != generated_word:
+        while source_word is not None and source_word != generated_word:
             source_word = source_picker.next_word()
-        if source_word == None:
-            raise Exception("Failed to match generated and source files")
+        if source_word is None:
+            raise Exception('Failed to match generated and source files')
 
         source_name = source_names[source_picker.source_index]
         if not source_name:
@@ -157,17 +170,8 @@ def build_source_map(sources, source_names, generated_name, generated_source):
     source_map_v3 = {}
     source_map_v3['version'] = 3
     source_map_v3['file'] = generated_name
-    source_map_v3['sourceRoot'] = ''
+    source_map_v3['sourceRoot'] = 'http://localhost:8090'
     source_map_v3['sources'] = [source for source in source_names if source]
     source_map_v3['names'] = []
     source_map_v3['mappings'] = source_mapping.value()
     return source_map_v3
-
-
-io = SourceMappingStringIO()
-io.write("/* this is some comment */")
-io.writeFile("1.txt")
-io.write("/* this is some other comment */")
-io.writeFile("2.txt")
-
-print build_source_map(io.sources, io.source_names, "out.txt", read_file("out.txt"))

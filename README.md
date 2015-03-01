@@ -1,6 +1,6 @@
 # sourcemap
 
-This is a program for generating sourcemaps based on input/output files only.
+This is a program for generating sourcemaps based on input/output files only in linear time.
 
 # Example
 
@@ -30,3 +30,8 @@ lushnikov:~/prog/sourcemap(master)$ cat script.js.map
 {"mappings": "AAGA,SAAS,MACL,QAAQ,MCJZ,QAAQ,IAAI", "sourceRoot": "http://localhost:8090", "sources": ["foo.js", "bar.js"], "version": 3, "names": [], "file": "script.js"}
 
 ```
+
+**Notes**:
+- `sourceRoot` is set to localhost; change it to whatever you want.
+- order of input files is crucial. If the script fails to match inputs with output, it fails with exception `Exception: Failed to match generated and source files`
+- it is supposed to work in linear time.

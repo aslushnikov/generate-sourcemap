@@ -101,31 +101,73 @@ class SourceMappingStringGenerator:
         return self._sourcemap.getvalue()
 
 
-file_names = ["1.txt", "2.txt"]
-output_file = "out.txt"
+class SourceMappingStringIO:
+    def __init__(self):
+        self._out = StringIO()
+        self.source_names = []
+        self.sources = []
 
-origin_sources = []
-for origin_file_name in file_names:
-    origin_sources.append(read_file(origin_file_name))
 
-generated_source = read_file(output_file)
+    def write(self, text):
+        self._out.write(text)
+        self.source_names.append(None)
+        self.sources.append(text)
 
-source_picker = WordPicker(origin_sources)
-generated_picker = WordPicker([generated_source])
 
-sourceMap = SourceMappingStringGenerator()
-while True:
-    generated_word = generated_picker.next_word()
-    if generated_word == None:
-        break;
-    source_word = source_picker.next_word()
-    while source_word != None and source_word != generated_word:
+    def writeFile(self, file_name):
+        text = read_file(file_name)
+        self._out.write(text)
+        self.source_names.append(file_name)
+        self.sources.append(text)
+
+
+    def getvalue(self):
+        return self._out.getvalue()
+
+
+def build_source_map(sources, source_names, generated_name, generated_source):
+    source_picker = WordPicker(sources)
+    generated_picker = WordPicker([generated_source])
+    named_source_indexes = dict()
+    named_index = 0
+    for source_name in source_names:
+        if not source_name:
+            continue
+        named_source_indexes[source_name] = named_index
+        named_index += 1
+
+    source_mapping = SourceMappingStringGenerator()
+    while True:
+        generated_word = generated_picker.next_word()
+        if generated_word == None:
+            break;
         source_word = source_picker.next_word()
-    if source_word == None:
-        raise Exception("Failed to match generated and source files")
-    word_len = len(generated_word)
-    sourceMap.add_mapping(generated_picker.line, generated_picker.column - word_len, source_picker.source_index, source_picker.line, source_picker.column - word_len)
+        while source_word != None and source_word != generated_word:
+            source_word = source_picker.next_word()
+        if source_word == None:
+            raise Exception("Failed to match generated and source files")
 
-print sourceMap.value()
+        source_name = source_names[source_picker.source_index]
+        if not source_name:
+            continue
+
+        word_len = len(generated_word)
+        source_mapping.add_mapping(generated_picker.line, generated_picker.column - word_len, named_source_indexes[source_name], source_picker.line, source_picker.column - word_len)
+
+    source_map_v3 = {}
+    source_map_v3['version'] = 3
+    source_map_v3['file'] = generated_name
+    source_map_v3['sourceRoot'] = ''
+    source_map_v3['sources'] = [source for source in source_names if source]
+    source_map_v3['names'] = []
+    source_map_v3['mappings'] = source_mapping.value()
+    return source_map_v3
 
 
+io = SourceMappingStringIO()
+io.write("/* this is some comment */")
+io.writeFile("1.txt")
+io.write("/* this is some other comment */")
+io.writeFile("2.txt")
+
+print build_source_map(io.sources, io.source_names, "out.txt", read_file("out.txt"))

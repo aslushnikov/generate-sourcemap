@@ -1,6 +1,6 @@
 # sourcemap
 
-This is a program for generating sourcemaps based on input/output files only in linear time.
+A tool for generating sourcemaps based on input/output files in linear time.
 
 # Example
 
@@ -18,7 +18,7 @@ File `bar.js`:
 console.log(foo());
 ```
 
-A build procedure concatenates these files, removes comments and spaces, produces `script.js`:
+Say you have a build procedure which concatenates these files and removes comments and spaces, producing `script.js`:
 ```javascript
 function foo(){return "foo";}console.log(foo());
 ```
@@ -34,4 +34,4 @@ lushnikov:~/prog/sourcemap(master)$ cat script.js.map
 **Notes**:
 - `sourceRoot` is set to localhost; change it to whatever you want.
 - order of input files is crucial. If the script fails to match inputs with output, it fails with exception `Exception: Failed to match generated and source files`
-- it is supposed to work in linear time.
+- Algorithm has linear complexity, though the current implementation is not quite fast and produces ~100k of sourcemapping in a second.
